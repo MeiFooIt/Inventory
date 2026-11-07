@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>青少年綜合服務中心 - 資產點存系統</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- SheetJS (Excel 匯入/匯出) -->
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  
+  <!-- HTML5 QR Code Scanner -->
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* 確保手機操作手感流暢 */
+    body {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    #reader video {
+      border-radius: 0.75rem;
+      object-fit: cover;
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background-color: #cbd5e1;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col pb-20 md:pb-0">
+
+  <!-- 頂部導航列 -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="bg-brand-600 text-white p-2 rounded-xl shadow-inner">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-base font-bold text-slate-900 leading-tight">資產快速點存</h1>
+          <p class="text-xs text-slate-500">青少年綜合服務中心</p>
+        </div>
+      </div>
+
+      <!-- 操作人員選擇 -->
+      <div class="flex items-center space-x-2">
+        <label class="text-xs text-slate-500 hidden sm:inline">點存人員:</label>
+        <select id="operatorSelect" onchange="updateOperator()" class="text-xs bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <option value="Emily (Admin)">Emily (Admin)</option>
+          <option value="同事 - 阿強">同事 - 阿強</option>
+          <option value="同事 - 嘉欣">同事 - 嘉欣</option>
+          <option value="義工 / 實習生">義工 / 實習生</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 桌面版標籤切換 -->
+    <div class="hidden md:flex border-t border-slate-100 max-w-6xl mx-auto px-4">
+      <button onclick="switchTab('scan')" id="tab-btn-scan-pc" class="tab-btn py-3 px-4 font-semibold text-sm border-b-2 border-brand-600 text-brand-600 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+        鏡頭點存
+      </button>
+      <button onclick="switchTab('list')" id="tab-btn-list-pc" class="tab-btn py-3 px-4 font-medium text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+        資產清單 & 管理 (<span id="pc-item-count">0</span>)
+      </button>
+      <button onclick="switchTab('excel')" id="tab-btn-excel-pc" class="tab-btn py-3 px-4 font-medium text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+        Excel 匯入／匯出
+      </button>
+    </div>
+  </header>
+
+  <!-- 主要內容區 -->
+  <main class="flex-1 max-w-6xl w-full mx-auto p-3 sm:p-5">
+    
+    <!-- 總體統計卡片 -->
+    <div class="grid grid-cols-3 gap-3 mb-4">
+      <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+        <span class="text-xs font-medium text-slate-400">總資產件數</span>
+        <span id="stat-total" class="text-xl sm:text-2xl font-bold text-slate-800">0</span>
+      </div>
+      <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-100 shadow-sm flex flex-col justify-between">
+        <span class="text-xs font-semibold text-emerald-600">已成功點存</span>
+        <span id="stat-scanned" class="text-xl sm:text-2xl font-bold text-emerald-700">0</span>
+      </div>
+      <div class="bg-amber-50 p-3 rounded-xl border border-amber-100 shadow-sm flex flex-col justify-between">
+        <span class="text-xs font-semibold text-amber-600">剩餘未點存</span>
+        <span id="stat-pending" class="text-xl sm:text-2xl font-bold text-amber-700">0</span>
+      </div>
+    </div>
+
+    <!-- 進度條 -->
+    <div class="w-full bg-slate-200 rounded-full h-2 mb-5 overflow-hidden">
+      <div id="stat-progress-bar" class="bg-emerald-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+    </div>
+
+    <!-- 視圖 1: 鏡頭掃描 (Mobile / Scanner Mode) -->
+    <section id="view-scan" class="space-y-4">
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center space-x-2">
+            <span class="relative flex h-3 w-3">
+              <span id="camera-ping" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span id="camera-dot" class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+            </span>
+            <h2 class="text-sm font-bold text-slate-800">QR Code 即時掃描器</h2>
+          </div>
+          <button id="toggleCameraBtn" onclick="toggleCamera()" class="text-xs px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 font-medium text-slate-600">
+            重啟相機
+          </button>
+        </div>
+
+        <!-- 掃描取景框 -->
+        <div class="relative bg-slate-900 rounded-xl overflow-hidden min-h-[260px] flex items-center justify-center">
+          <div id="reader" class="w-full"></div>
+          <div id="camera-loading" class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 p-4 bg-slate-900 z-10 hidden">
+            <svg class="animate-spin h-8 w-8 text-brand-500 mb-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+            <span class="text-xs">正在啟動相機鏡頭...</span>
+          </div>
+        </div>
+
+        <!-- 手動補打編號 (備用方案) -->
+        <div class="mt-3 flex gap-2">
+          <input type="text" id="manualCodeInput" placeholder="如標籤破損，請直接手動輸入編號..." class="flex-1 text-sm bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 uppercase focus:ring-2 focus:ring-brand-500 outline-none">
+          <button onclick="handleManualSubmit()" class="bg-brand-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-brand-700 active:scale-95 transition-all">
+            確認
+          </button>
+        </div>
+      </div>
+
+      <!-- 最近掃描提示卡 -->
+      <div id="scan-feedback" class="transition-all duration-300 p-4 rounded-xl border border-slate-200 bg-white shadow-sm flex items-start gap-3 hidden">
+        <div id="feedback-icon" class="p-2 rounded-lg mt-0.5"></div>
+        <div class="flex-1">
+          <h3 id="feedback-title" class="font-bold text-sm">--</h3>
+          <p id="feedback-detail" class="text-xs text-slate-500 mt-0.5">--</p>
+        </div>
+      </div>
+
+      <!-- 剛完成的歷史即時紀錄 -->
+      <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">本次點存即時紀錄</h3>
+        <div id="recent-scans-list" class="divide-y divide-slate-100 text-xs">
+          <p class="text-slate-400 py-3 text-center">尚未有掃描紀錄，請對準 QR Code 開始點存</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 視圖 2: 資產清單與 CRUD 管理 -->
+    <section id="view-list" class="space-y-4 hidden">
+      <!-- 篩選與工具列 -->
+      <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-2 justify-between items-center">
+        <div class="flex w-full sm:w-auto gap-2">
+          <input type="text" id="searchInput" oninput="renderTable()" placeholder="搜尋編號、物品名稱、分類..." class="text-xs bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <select id="statusFilter" onchange="renderTable()" class="text-xs bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-2 font-medium text-slate-600">
+            <option value="all">所有狀態</option>
+            <option value="scanned">已點存</option>
+            <option value="unscanned">未點存</option>
+          </select>
+        </div>
+        
+        <div class="flex w-full sm:w-auto justify-end gap-2">
+          <button onclick="openAddModal()" class="w-full sm:w-auto bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center justify-center gap-1.5 shadow-sm">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+            手動新增物資
+          </button>
+        </div>
+      </div>
+
+      <!-- 物資表格 -->
+      <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto custom-scroll max-h-[500px]">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="bg-slate-50 sticky top-0 border-b border-slate-200 z-10 text-slate-600 font-semibold">
+              <tr>
+                <th class="p-3">資產編號</th>
+                <th class="p-3">物品名稱</th>
+                <th class="p-3 hidden sm:table-cell">分類</th>
+                <th class="p-3">狀態</th>
+                <th class="p-3 hidden md:table-cell">點存人員 / 時間</th>
+                <th class="p-3 text-right">操作</th>
+              </tr>
+            </thead>
+            <tbody id="asset-table-body" class="divide-y divide-slate-100">
+              <!-- 動態生成表格行 -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 視圖 3: Excel 匯入 / 匯出 -->
+    <section id="view-excel" class="space-y-4 hidden">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- 匯入 Excel -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <div class="w-10 h-10 rounded-xl bg-indigo-50 text-brand-600 flex items-center justify-center mb-3">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+            </div>
+            <h3 class="font-bold text-slate-800 text-sm">匯入現有物資 Excel 表</h3>
+            <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+              支援拖放或選擇現有清單（.xlsx 或 .csv）。系統會自動識別資產編號、物品名稱與分類。採用<b>合併（Merge）模式</b>，現有手動登記項目不會遺失。
+            </p>
+          </div>
+
+          <div class="mt-4">
+            <label class="block w-full border-2 border-dashed border-slate-300 hover:border-brand-500 rounded-xl p-6 text-center cursor-pointer bg-slate-50 hover:bg-brand-50/50 transition-all">
+              <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleExcelUpload(event)">
+              <span class="text-xs font-semibold text-brand-600">點擊上載或拖放 Excel</span>
+              <p class="text-[10px] text-slate-400 mt-1">支援 .xlsx, .xls, .csv 檔案</p>
+            </label>
+            <button onclick="downloadSampleTemplate()" class="mt-2 text-[11px] text-slate-500 hover:text-brand-600 underline text-center block w-full">
+              下載範本 Excel (Sample Template)
+            </button>
+          </div>
+        </div>
+
+        <!-- 匯出 Excel -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            </div>
+            <h3 class="font-bold text-slate-800 text-sm">匯出點存結果報告</h3>
+            <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+              一鍵將當前點存進度打包下載為最新 Excel 報告。包含原始欄位，並附加「點存狀態（已點存/未點存）」、「點存時間」及「點存人員」。
+            </p>
+          </div>
+
+          <div class="mt-4 space-y-2">
+            <button onclick="exportToExcel()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.98]">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+              即刻下載點存結果 Excel
+            </button>
+            <button onclick="confirmResetInventory()" class="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-medium py-2.5 px-4 rounded-xl text-xs transition-all border border-rose-200">
+              重設所有點存標記 (開始新一輪點存)
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 手機版底部導航欄 (Mobile First Navigation) -->
+  <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-30 flex justify-around p-1 shadow-lg">
+    <button onclick="switchTab('scan')" id="tab-btn-scan-m" class="flex-1 py-2 flex flex-col items-center text-brand-600 font-bold text-[11px]">
+      <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
+      掃描點存
+    </button>
+    <button onclick="switchTab('list')" id="tab-btn-list-m" class="flex-1 py-2 flex flex-col items-center text-slate-400 font-medium text-[11px]">
+      <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+      資產清單
+    </button>
+    <button onclick="switchTab('excel')" id="tab-btn-excel-m" class="flex-1 py-2 flex flex-col items-center text-slate-400 font-medium text-[11px]">
+      <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+      Excel 匯出
+    </button>
+  </nav>
+
+  <!-- 手動新增/修改資產 Modal -->
+  <div id="itemModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-slate-100">
+      <div class="flex justify-between items-center mb-4">
+        <h3 id="modalTitle" class="font-bold text-slate-800 text-sm">新增物資資料</h3>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+      </div>
+
+      <form id="itemForm" onsubmit="saveItem(event)" class="space-y-3">
+        <input type="hidden" id="editOriginalCode">
+        
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">資產編號 (QR Code 內容) *</label>
+          <input type="text" id="modalCode" required placeholder="如 EL00124" class="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2.5 uppercase focus:ring-2 focus:ring-brand-500 outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">物品名稱 *</label>
+          <input type="text" id="modalName" required placeholder="如 Lenovo 筆記型電腦" class="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none">
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">分類</label>
+            <input type="text" id="modalCategory" placeholder="如 IT設備 / 活動器材" class="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">放置位置 (選填)</label>
+            <input type="text" id="modalLocation" placeholder="如 201 多用途室" class="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">備註</label>
+          <input type="text" id="modalNotes" placeholder="如 需配備充電線" class="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none">
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3">
+          <button type="button" onclick="closeModal()" class="px-3.5 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg">取消</button>
+          <button type="submit" class="px-4 py-2 text-xs font-semibold bg-brand-600 hover:bg-brand-700 text-white rounded-lg shadow-sm">儲存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 系統核心邏輯 -->
+  <script>
+    // 預設資料 (若使用者尚未上載 Excel)
+    const DEFAULT_ASSETS = [
+      { code: "EL00124", name: "Lenovo ThinkPad 筆記型電腦", category: "IT設備", location: "活動室 1", status: "unscanned", scanned_by: "", scanned_at: "", notes: "" },
+      { code: "EL00125A", name: "機械人編程套裝 (主控制器)", category: "STEM器材", location: "STEM工作室", status: "unscanned", scanned_by: "", scanned_at: "", notes: "整組需連同A-D點存" },
+      { code: "EL00125B", name: "機械人編程套裝 (傳感器盒)", category: "STEM器材", location: "STEM工作室", status: "unscanned", scanned_by: "", scanned_at: "", notes: "" },
+      { code: "AV00301", name: "Sony 無線麥克風 (一對)", category: "影音器材", location: "大禮堂音響櫃", status: "unscanned", scanned_by: "", scanned_at: "", notes: "" },
+      { code: "GM00042", name: "桌遊 - 卡卡頌 (Carcassonne)", category: "青年桌遊", location: "休閒閣", status: "unscanned", scanned_by: "", scanned_at: "", notes: "" }
+    ];
+
+    // 全局狀態
+    let assets = [];
+    let currentOperator = "Emily (Admin)";
+    let html5QrCode = null;
+    let isCameraRunning = false;
+    let recentScans = [];
+    let scanThrottle = false; // 防重覆防抖開關
+
+    // 初始化應用程式
+    document.addEventListener("DOMContentLoaded", () => {
+      loadAssetsFromStorage();
+      updateOperator();
+      startCamera();
+      updateDashboard();
+      renderTable();
+    });
+
+    // 讀取本地儲存
+    function loadAssetsFromStorage() {
+      const saved = localStorage.getItem("inventory_assets");
+      if (saved) {
+        try {
+          assets = JSON.parse(saved);
+        } catch (e) {
+          assets = [...DEFAULT_ASSETS];
+        }
+      } else {
+        assets = [...DEFAULT_ASSETS];
+        saveAssetsToStorage();
+      }
+    }
+
+    function saveAssetsToStorage() {
+      localStorage.setItem("inventory_assets", JSON.stringify(assets));
+      updateDashboard();
+    }
+
+    function updateOperator() {
+      currentOperator = document.getElementById("operatorSelect").value;
+    }
+
+    // 更新統計看板與進度條
+    function updateDashboard() {
+      const activeAssets = assets.filter(a => a.status !== "deleted");
+      const total = activeAssets.length;
+      const scanned = activeAssets.filter(a => a.status === "scanned").length;
+      const pending = total - scanned;
+      const percent = total === 0 ? 0 : Math.round((scanned / total) * 100);
+
+      document.getElementById("stat-total").innerText = total;
+      document.getElementById("stat-scanned").innerText = scanned;
+      document.getElementById("stat-pending").innerText = pending;
+      document.getElementById("pc-item-count").innerText = total;
+
+      const progressBar = document.getElementById("stat-progress-bar");
+      progressBar.style.width = percent + "%";
+    }
+
+    // ==========================================
+    // QR Code 掃描核心與音效震動反饋
+    // ==========================================
+    
+    // Web Audio 合成器（不需任何外部音檔）
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playSound(type) {
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      if (type === "success") {
+        // 清脆「嗶」聲
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + 0.15);
+        if (navigator.vibrate) navigator.vibrate(80);
+      } else if (type === "warning") {
+        // 重複警告「嘟-嘟」
+        osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + 0.3);
+        if (navigator.vibrate) navigator.vibrate([60, 50, 60]);
+      } else if (type === "error") {
+        // 錯誤低音
+        osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + 0.4);
+        if (navigator.vibrate) navigator.vibrate([150]);
+      }
+    }
+
+    function startCamera() {
+      const cameraLoading = document.getElementById("camera-loading");
+      cameraLoading.classList.remove("hidden");
+      
+      html5QrCode = new Html5Qrcode("reader");
+      const config = { fps: 15, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 };
+
+      html5QrCode.start(
+        { facingMode: "environment" },
+        config,
+        onScanSuccess
+      ).then(() => {
+        isCameraRunning = true;
+        cameraLoading.classList.add("hidden");
+        document.getElementById("toggleCameraBtn").innerText = "暫停相機";
+      }).catch(err => {
+        console.warn("相機啟動錯誤:", err);
+        cameraLoading.innerHTML = `<span class="text-xs text-rose-400 p-3 text-center">無法啟動鏡頭。請確保處於 HTTPS 環境並已授予鏡頭權限。<br>可使用下方手動輸入。</span>`;
+        document.getElementById("toggleCameraBtn").innerText = "重試相機";
+      });
+    }
+
+    function toggleCamera() {
+      if (isCameraRunning && html5QrCode) {
+        html5QrCode.stop().then(() => {
+          isCameraRunning = false;
+          document.getElementById("toggleCameraBtn").innerText = "開啟相機";
+          document.getElementById("camera-ping").classList.add("hidden");
+          document.getElementById("camera-dot").className = "relative inline-flex rounded-full h-3 w-3 bg-slate-400";
+        });
+      } else {
+        startCamera();
+        document.getElementById("camera-ping").classList.remove("hidden");
+        document.getElementById("camera-dot").className = "relative inline-flex rounded-full h-3 w-3 bg-emerald-500";
+      }
+    }
+
+    // 處理掃描核心邏輯
+    function onScanSuccess(decodedText) {
+      if (scanThrottle) return;
+      scanThrottle = true;
+      setTimeout(() => { scanThrottle = false; }, 1800); // 防抖 1.8 秒
+
+      const code = decodedText.trim().toUpperCase();
+      processCodeVerification(code);
+    }
+
+    function handleManualSubmit() {
+      const input = document.getElementById("manualCodeInput");
+      const code = input.value.trim().toUpperCase();
+      if (!code) return;
+      processCodeVerification(code);
+      input.value = "";
+    }
+
+    function processCodeVerification(code) {
+      const now = new Date();
+      const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+      
+      const item = assets.find(a => a.code.toUpperCase() === code && a.status !== "deleted");
+
+      if (!item) {
+        // 情況 1: 無效編號 / Excel 內沒有
+        playSound("error");
+        showFeedback("error", `查無此編號：${code}`, "清單內找不到對應的物資紀錄，請向 Emily 核對。");
+        pushRecentScan(code, "查無此項目", "error", timeString);
+        return;
+      }
+
+      if (item.status === "scanned") {
+        // 情況 2: 重複掃描
+        playSound("warning");
+        showFeedback("warning", `重複點存：${item.name}`, `此項目已由 [${item.scanned_by}] 於 ${item.scanned_at} 點存，無需重複記錄。`);
+        pushRecentScan(item.code, `${item.name} (已點存)`, "warning", timeString);
+        return;
+      }
+
+      // 情況 3: 點存成功！
+      item.status = "scanned";
+      item.scanned_by = currentOperator;
+      item.scanned_at = `${now.toISOString().split('T')[0]} ${timeString}`;
+      
+      playSound("success");
+      showFeedback("success", `成功點存：${item.name}`, `編號 ${item.code} 已記錄完成！操作人：${currentOperator}`);
+      pushRecentScan(item.code, item.name, "success", timeString);
+
+      saveAssetsToStorage();
+      renderTable();
+    }
+
+    function showFeedback(type, title, detail) {
+      const box = document.getElementById("scan-feedback");
+      const icon = document.getElementById("feedback-icon");
+      const t = document.getElementById("feedback-title");
+      const d = document.getElementById("feedback-detail");
+
+      box.classList.remove("hidden", "bg-emerald-50", "border-emerald-200", "bg-amber-50", "border-amber-200", "bg-rose-50", "border-rose-200");
+      
+      if (type === "success") {
+        box.classList.add("bg-emerald-50", "border-emerald-200");
+        icon.className = "p-2 rounded-lg mt-0.5 bg-emerald-100 text-emerald-600";
+        icon.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
+        t.className = "font-bold text-sm text-emerald-900";
+      } else if (type === "warning") {
+        box.classList.add("bg-amber-50", "border-amber-200");
+        icon.className = "p-2 rounded-lg mt-0.5 bg-amber-100 text-amber-600";
+        icon.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>`;
+        t.className = "font-bold text-sm text-amber-900";
+      } else {
+        box.classList.add("bg-rose-50", "border-rose-200");
+        icon.className = "p-2 rounded-lg mt-0.5 bg-rose-100 text-rose-600";
+        icon.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>`;
+        t.className = "font-bold text-sm text-rose-900";
+      }
+
+      t.innerText = title;
+      d.innerText = detail;
+    }
+
+    function pushRecentScan(code, title, type, time) {
+      recentScans.unshift({ code, title, type, time });
+      if (recentScans.length > 5) recentScans.pop();
+
+      const listEl = document.getElementById("recent-scans-list");
+      listEl.innerHTML = recentScans.map(s => {
+        let badge = `<span class="text-emerald-600 font-bold">成功</span>`;
+        if (s.type === "warning") badge = `<span class="text-amber-600 font-bold">重複</span>`;
+        if (s.type === "error") badge = `<span class="text-rose-600 font-bold">無效</span>`;
+        return `
+          <div class="py-2 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">${s.code}</span>
+              <span class="text-slate-800 font-medium truncate max-w-[160px]">${s.title}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              ${badge}
+              <span class="text-[10px] text-slate-400">${s.time}</span>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    // ==========================================
+    // 物資表格清單與 CRUD 模組
+    // ==========================================
+
+    function renderTable() {
+      const search = document.getElementById("searchInput").value.toLowerCase();
+      const statusFilter = document.getElementById("statusFilter").value;
+      const tbody = document.getElementById("asset-table-body");
+
+      const filtered = assets.filter(item => {
+        if (item.status === "deleted") return false;
+        const matchesSearch = item.code.toLowerCase().includes(search) || 
+                              item.name.toLowerCase().includes(search) || 
+                              (item.category && item.category.toLowerCase().includes(search));
+        const matchesStatus = (statusFilter === "all") || (item.status === statusFilter);
+        return matchesSearch && matchesStatus;
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">沒有符合條件的物資紀錄</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(item => {
+        const isScanned = item.status === "scanned";
+        const statusBadge = isScanned
+          ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800">已點存</span>`
+          : `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600">未點存</span>`;
+
+        return `
+          <tr class="hover:bg-slate-50 transition-colors">
+            <td class="p-3 font-mono font-semibold text-slate-800">${item.code}</td>
+            <td class="p-3">
+              <div class="font-medium text-slate-900">${item.name}</div>
+              ${item.location ? `<div class="text-[10px] text-slate-400">${item.location}</div>` : ''}
+            </td>
+            <td class="p-3 hidden sm:table-cell text-slate-600">${item.category || '-'}</td>
+            <td class="p-3">${statusBadge}</td>
+            <td class="p-3 hidden md:table-cell text-slate-500">
+              ${isScanned ? `${item.scanned_by}<br><span class="text-[10px] text-slate-400">${item.scanned_at}</span>` : '-'}
+            </td>
+            <td class="p-3 text-right">
+              <button onclick="openEditModal('${item.code}')" class="text-brand-600 hover:text-brand-800 font-medium mr-2">修改</button>
+              <button onclick="deleteItem('${item.code}')" class="text-rose-500 hover:text-rose-700 font-medium">刪除</button>
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function openAddModal() {
+      document.getElementById("modalTitle").innerText = "新增物資資料";
+      document.getElementById("editOriginalCode").value = "";
+      document.getElementById("modalCode").value = "";
+      document.getElementById("modalCode").disabled = false;
+      document.getElementById("modalName").value = "";
+      document.getElementById("modalCategory").value = "";
+      document.getElementById("modalLocation").value = "";
+      document.getElementById("modalNotes").value = "";
+      document.getElementById("itemModal").classList.remove("hidden");
+    }
+
+    function openEditModal(code) {
+      const item = assets.find(a => a.code === code);
+      if (!item) return;
+
+      document.getElementById("modalTitle").innerText = "修改物資資料";
+      document.getElementById("editOriginalCode").value = item.code;
+      document.getElementById("modalCode").value = item.code;
+      document.getElementById("modalCode").disabled = true; // 主鍵編號不可直接竄改
+      document.getElementById("modalName").value = item.name;
+      document.getElementById("modalCategory").value = item.category || "";
+      document.getElementById("modalLocation").value = item.location || "";
+      document.getElementById("modalNotes").value = item.notes || "";
+      document.getElementById("itemModal").classList.remove("hidden");
+    }
+
+    function closeModal() {
+      document.getElementById("itemModal").classList.add("hidden");
+    }
+
+    function saveItem(e) {
+      e.preventDefault();
+      const origCode = document.getElementById("editOriginalCode").value;
+      const code = document.getElementById("modalCode").value.trim().toUpperCase();
+      const name = document.getElementById("modalName").value.trim();
+      const category = document.getElementById("modalCategory").value.trim();
+      const location = document.getElementById("modalLocation").value.trim();
+      const notes = document.getElementById("modalNotes").value.trim();
+
+      if (origCode) {
+        // 修改既有
+        const item = assets.find(a => a.code === origCode);
+        if (item) {
+          item.name = name;
+          item.category = category;
+          item.location = location;
+          item.notes = notes;
+        }
+      } else {
+        // 新增 (檢查重複)
+        const exists = assets.find(a => a.code === code && a.status !== "deleted");
+        if (exists) {
+          alert(`資產編號 ${code} 已經存在！請使用其他編號。`);
+          return;
+        }
+        assets.push({
+          code,
+          name,
+          category,
+          location,
+          notes,
+          status: "unscanned",
+          scanned_by: "",
+          scanned_at: ""
+        });
+      }
+
+      saveAssetsToStorage();
+      renderTable();
+      closeModal();
+    }
+
+    function deleteItem(code) {
+      if (confirm(`確定要刪除物資 [${code}] 嗎？`)) {
+        // 採取安全軟刪除 (Soft Delete)
+        const item = assets.find(a => a.code === code);
+        if (item) {
+          item.status = "deleted";
+          saveAssetsToStorage();
+          renderTable();
+        }
+      }
+    }
+
+    // ==========================================
+    // Excel 匯入 / 匯出處理 (SheetJS)
+    // ==========================================
+
+    function handleExcelUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: "array" });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+        if (json.length < 2) {
+          alert("Excel 檔案內容不足或空白。");
+          return;
+        }
+
+        // 動態分析標題行對應
+        const headers = json[0].map(h => String(h).trim().toLowerCase());
+        let codeIdx = headers.findIndex(h => h.includes("編號") || h.includes("code") || h.includes("id"));
+        let nameIdx = headers.findIndex(h => h.includes("名稱") || h.includes("name") || h.includes("物品"));
+        let catIdx = headers.findIndex(h => h.includes("分類") || h.includes("類別") || h.includes("category"));
+        let locIdx = headers.findIndex(h => h.includes("位置") || h.includes("地點") || h.includes("location"));
+
+        if (codeIdx === -1 || nameIdx === -1) {
+          // 若無明確欄位，預設第 0 欄為編號、第 1 欄為名稱
+          codeIdx = 0;
+          nameIdx = 1;
+        }
+
+        let importCount = 0;
+        let updateCount = 0;
+
+        for (let i = 1; i < json.length; i++) {
+          const row = json[i];
+          if (!row || !row[codeIdx]) continue;
+
+          const code = String(row[codeIdx]).trim().toUpperCase();
+          const name = row[nameIdx] ? String(row[nameIdx]).trim() : "未命名物品";
+          const category = (catIdx !== -1 && row[catIdx]) ? String(row[catIdx]).trim() : "一般物資";
+          const location = (locIdx !== -1 && row[locIdx]) ? String(row[locIdx]).trim() : "";
+
+          // Upsert 機制：若存在則保留點存狀態只更新名稱；不存在則新增
+          const existing = assets.find(a => a.code === code);
+          if (existing) {
+            existing.name = name;
+            if (category) existing.category = category;
+            if (location) existing.location = location;
+            if (existing.status === "deleted") existing.status = "unscanned";
+            updateCount++;
+          } else {
+            assets.push({
+              code,
+              name,
+              category,
+              location,
+              notes: "",
+              status: "unscanned",
+              scanned_by: "",
+              scanned_at: ""
+            });
+            importCount++;
+          }
+        }
+
+        saveAssetsToStorage();
+        renderTable();
+        alert(`成功匯入！\n新增物資: ${importCount} 筆\n更新資料: ${updateCount} 筆`);
+        switchTab("list");
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function exportToExcel() {
+      const activeAssets = assets.filter(a => a.status !== "deleted");
+      if (activeAssets.length === 0) {
+        alert("目前清單內沒有任何資料可供匯出。");
+        return;
+      }
+
+      // 構建結構化的匯出資料
+      const exportData = activeAssets.map(item => ({
+        "資產編號": item.code,
+        "物品名稱": item.name,
+        "分類": item.category || "",
+        "原紀錄位置": item.location || "",
+        "點存狀態": item.status === "scanned" ? "已點存" : "未點存",
+        "點存時間": item.scanned_at || "",
+        "點存人員": item.scanned_by || "",
+        "備註": item.notes || ""
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "點存報告");
+
+      // 自動產生檔名帶當天日期
+      const dateStr = new Date().toISOString().split('T')[0];
+      XLSX.writeFile(workbook, `資產點存報告_${dateStr}.xlsx`);
+    }
+
+    function downloadSampleTemplate() {
+      const sample = [
+        { "資產編號": "EL001", "物品名稱": "投影機 A", "分類": "影音", "位置": "大堂" },
+        { "資產編號": "EL002", "物品名稱": "手提喇叭", "分類": "影音", "位置": "儲物室" },
+        { "資產編號": "EL003", "物品名稱": "活動帳篷 (藍色)", "分類": "戶外器材", "位置": "儲物室" }
+      ];
+      const ws = XLSX.utils.json_to_sheet(sample);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "物資範本");
+      XLSX.writeFile(wb, "物資匯入範本.xlsx");
+    }
+
+    function confirmResetInventory() {
+      if (confirm("警告：此操作會將全部物資的「已點存」狀態重設為「未點存」，以便進行新一輪盤點。\n\n確定要重設嗎？")) {
+        assets.forEach(a => {
+          if (a.status !== "deleted") {
+            a.status = "unscanned";
+            a.scanned_by = "";
+            a.scanned_at = "";
+          }
+        });
+        recentScans = [];
+        document.getElementById("recent-scans-list").innerHTML = `<p class="text-slate-400 py-3 text-center">已開始新一輪點存</p>`;
+        saveAssetsToStorage();
+        renderTable();
+        alert("已成功重設！可開始新一輪點存。");
+      }
+    }
+
+    // ==========================================
+    // 標籤頁面切換控制
+    // ==========================================
+    function switchTab(tabId) {
+      document.getElementById("view-scan").classList.add("hidden");
+      document.getElementById("view-list").classList.add("hidden");
+      document.getElementById("view-excel").classList.add("hidden");
+      document.getElementById(`view-${tabId}`).classList.remove("hidden");
+
+      // 手機底欄樣式切換
+      ["scan", "list", "excel"].forEach(t => {
+        const btnM = document.getElementById(`tab-btn-${t}-m`);
+        const btnPc = document.getElementById(`tab-btn-${t}-pc`);
+        if (t === tabId) {
+          btnM.className = "flex-1 py-2 flex flex-col items-center text-brand-600 font-bold text-[11px]";
+          btnPc.className = "tab-btn py-3 px-4 font-semibold text-sm border-b-2 border-brand-600 text-brand-600 flex items-center gap-2";
+        } else {
+          btnM.className = "flex-1 py-2 flex flex-col items-center text-slate-400 font-medium text-[11px]";
+          btnPc.className = "tab-btn py-3 px-4 font-medium text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center gap-2";
+        }
+      });
+
+      if (tabId === "list") {
+        renderTable();
+      }
+    }
+  </script>
+</body>
+</html>
