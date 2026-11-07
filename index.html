@@ -69,15 +69,12 @@
         </div>
       </div>
 
-      <!-- 操作人員選擇 -->
+      <!-- 操作人員與管理員解鎖 -->
       <div class="flex items-center space-x-2">
-        <label class="text-xs text-slate-500 hidden sm:inline">點存人員:</label>
-        <select id="operatorSelect" onchange="updateOperator()" class="text-xs bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500">
-          <option value="Emily (Admin)">Emily (Admin)</option>
-          <option value="同事 - 阿強">同事 - 阿強</option>
-          <option value="同事 - 嘉欣">同事 - 嘉欣</option>
-          <option value="義工 / 實習生">義工 / 實習生</option>
-        </select>
+        <input type="text" id="operatorInput" onchange="updateOperator()" value="點存同事" placeholder="輸入姓名" class="text-xs bg-slate-50 border border-slate-300 rounded-lg px-2 py-1.5 w-20 focus:outline-none focus:ring-2 focus:ring-brand-500 text-center">
+        <button id="adminLoginBtn" onclick="openAdminModal()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 px-2 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1">
+          🔒 <span class="hidden sm:inline">管理員</span>
+        </button>
       </div>
     </div>
 
@@ -87,11 +84,11 @@
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
         鏡頭點存
       </button>
-      <button onclick="switchTab('list')" id="tab-btn-list-pc" class="tab-btn py-3 px-4 font-medium text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center gap-2">
+      <button onclick="switchTab('list')" id="tab-btn-list-pc" class="admin-only hidden tab-btn py-3 px-4 font-medium text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center gap-2">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
         資產清單 & 管理 (<span id="pc-item-count">0</span>)
       </button>
-      <button onclick="switchTab('excel')" id="tab-btn-excel-pc" class="tab-btn py-3 px-4 font-medium text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center gap-2">
+      <button onclick="switchTab('excel')" id="tab-btn-excel-pc" class="admin-only hidden tab-btn py-3 px-4 font-medium text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center gap-2">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
         Excel 匯入／匯出
       </button>
@@ -276,15 +273,30 @@
       <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
       掃描點存
     </button>
-    <button onclick="switchTab('list')" id="tab-btn-list-m" class="flex-1 py-2 flex flex-col items-center text-slate-400 font-medium text-[11px]">
+    <button onclick="switchTab('list')" id="tab-btn-list-m" class="admin-only hidden flex-1 py-2 flex flex-col items-center text-slate-400 font-medium text-[11px]">
       <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
       資產清單
     </button>
-    <button onclick="switchTab('excel')" id="tab-btn-excel-m" class="flex-1 py-2 flex flex-col items-center text-slate-400 font-medium text-[11px]">
+    <button onclick="switchTab('excel')" id="tab-btn-excel-m" class="admin-only hidden flex-1 py-2 flex flex-col items-center text-slate-400 font-medium text-[11px]">
       <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
       Excel 匯出
     </button>
   </nav>
+
+  <!-- 管理員登入 Modal -->
+  <div id="adminModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-100 transform transition-all">
+      <h3 class="font-bold text-slate-800 text-sm mb-4 flex items-center gap-2">
+        <span class="text-lg">🔒</span> 管理員模式解鎖
+      </h3>
+      <input type="password" id="adminPin" placeholder="請輸入 PIN 碼" class="w-full text-center tracking-[0.5em] text-xl bg-slate-50 border border-slate-300 rounded-lg p-3 focus:ring-2 focus:ring-brand-500 outline-none mb-4">
+      <div id="adminErrorMsg" class="text-rose-500 text-xs text-center mb-3 hidden">密碼錯誤，請重試。</div>
+      <div class="flex justify-end gap-2">
+        <button type="button" onclick="closeAdminModal()" class="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg w-full">取消</button>
+        <button type="button" onclick="verifyAdmin()" class="px-4 py-2 text-xs font-semibold bg-brand-600 hover:bg-brand-700 text-white rounded-lg shadow-sm w-full">驗證並解鎖</button>
+      </div>
+    </div>
+  </div>
 
   <!-- 手動新增/修改資產 Modal -->
   <div id="itemModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
@@ -344,11 +356,12 @@
 
     // 全局狀態
     let assets = [];
-    let currentOperator = "Emily (Admin)";
+    let currentOperator = "點存同事";
     let html5QrCode = null;
     let isCameraRunning = false;
     let recentScans = [];
     let scanThrottle = false; // 防重覆防抖開關
+    let isAdminUnlocked = false; // 紀錄管理員狀態
 
     // 初始化應用程式
     document.addEventListener("DOMContentLoaded", () => {
@@ -380,7 +393,41 @@
     }
 
     function updateOperator() {
-      currentOperator = document.getElementById("operatorSelect").value;
+      currentOperator = document.getElementById("operatorInput").value.trim() || "點存同事";
+    }
+
+    // ==========================================
+    // 管理員解鎖邏輯
+    // ==========================================
+    function openAdminModal() {
+      document.getElementById("adminModal").classList.remove("hidden");
+      document.getElementById("adminPin").value = "";
+      document.getElementById("adminErrorMsg").classList.add("hidden");
+      setTimeout(() => document.getElementById("adminPin").focus(), 100);
+    }
+
+    function closeAdminModal() {
+      document.getElementById("adminModal").classList.add("hidden");
+    }
+
+    function verifyAdmin() {
+      const pin = document.getElementById("adminPin").value;
+      if (pin === "8888") {
+        isAdminUnlocked = true;
+        
+        // 顯示被隱藏的選單
+        const adminElements = document.querySelectorAll(".admin-only");
+        adminElements.forEach(el => el.classList.remove("hidden"));
+        
+        // 隱藏登入按鈕
+        document.getElementById("adminLoginBtn").classList.add("hidden");
+        
+        closeAdminModal();
+      } else {
+        document.getElementById("adminErrorMsg").classList.remove("hidden");
+        document.getElementById("adminPin").value = "";
+        document.getElementById("adminPin").focus();
+      }
     }
 
     // 更新統計看板與進度條
@@ -507,7 +554,7 @@
       if (!item) {
         // 情況 1: 無效編號 / Excel 內沒有
         playSound("error");
-        showFeedback("error", `查無此編號：${code}`, "清單內找不到對應的物資紀錄，請向 Emily 核對。");
+        showFeedback("error", `查無此編號：${code}`, "清單內找不到對應的物資紀錄，請向管理員核對。");
         pushRecentScan(code, "查無此項目", "error", timeString);
         return;
       }
