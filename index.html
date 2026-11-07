@@ -343,6 +343,100 @@
     </div>
   </div>
 
+  <!-- Firebase 核心與資料同步模組 -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, collection, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // ====== 請將以下 YOUR_XXXX 替換為你在 Firebase 後台獲取的真實資料 ======
+    const defaultConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+    
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : defaultConfig;
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'local-inventory-app';
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // 暴露 API 畀主程式呼叫
+    window.FirebaseAPI = {
+      ready: false,
+      syncActive: false,
+      updateAsset: async (asset) => {},
+      batchUpsert: async (assetsArray) => {}
+    };
+
+    async function initAuth() {
+      try {
+        if (typeof __initial_auth_token !== 'undefined') {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+        window.FirebaseAPI.ready = true;
+        startRealtimeSync();
+      } catch (e) {
+        console.error("Firebase Auth 錯誤:", e);
+      }
+    }
+
+    function startRealtimeSync() {
+      const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'inventory_items');
+      
+      // 實時監聽雲端資料庫變更
+      onSnapshot(colRef, (snapshot) => {
+        const cloudAssets = [];
+        snapshot.forEach(doc => cloudAssets.push(doc.data()));
+        
+        if (cloudAssets.length > 0 || !window.FirebaseAPI.syncActive) {
+          // 如果雲端有資料，就以雲端為準覆蓋本機
+          if (cloudAssets.length > 0) {
+            window.assets = cloudAssets;
+            localStorage.setItem("inventory_assets", JSON.stringify(cloudAssets));
+          }
+          window.FirebaseAPI.syncActive = true;
+          
+          if (typeof window.updateDashboard === 'function') window.updateDashboard();
+          if (typeof window.renderTable === 'function') window.renderTable();
+        }
+      }, (error) => {
+        console.error("Firebase 同步錯誤:", error);
+      });
+
+      // 定義上傳單一物件
+      window.FirebaseAPI.updateAsset = async (asset) => {
+        if (!auth.currentUser) return;
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'inventory_items', asset.code);
+        await setDoc(docRef, asset, { merge: true });
+      };
+
+      // 定義批次上傳 (Excel 匯入用，處理過大數據會斬件上傳)
+      window.FirebaseAPI.batchUpsert = async (assetsArray) => {
+        if (!auth.currentUser) return;
+        const chunkSize = 400; // Firebase 限制每次 batch 最多 500 個操作
+        for (let i = 0; i < assetsArray.length; i += chunkSize) {
+          const chunk = assetsArray.slice(i, i + chunkSize);
+          const batch = writeBatch(db);
+          chunk.forEach(asset => {
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'inventory_items', asset.code);
+            batch.set(docRef, asset, { merge: true });
+          });
+          await batch.commit();
+        }
+      };
+    }
+
+    initAuth();
+  </script>
+
   <!-- 系統核心邏輯 -->
   <script>
     // 預設資料 (若使用者尚未上載 Excel)
@@ -383,13 +477,25 @@
         }
       } else {
         assets = [...DEFAULT_ASSETS];
-        saveAssetsToStorage();
+        saveAssetsToStorage(null, true); // 第一次初始化推上雲端
       }
     }
 
-    function saveAssetsToStorage() {
+    // 統一儲存邏輯 (支援雲端與本機雙軌)
+    function saveAssetsToStorage(singleItem = null, isBulk = false) {
       localStorage.setItem("inventory_assets", JSON.stringify(assets));
       updateDashboard();
+      
+      // 同步到 Firebase 雲端
+      if (window.FirebaseAPI && window.FirebaseAPI.ready) {
+        if (isBulk) {
+          window.FirebaseAPI.batchUpsert(assets);
+        } else if (singleItem) {
+          window.FirebaseAPI.updateAsset(singleItem);
+        } else {
+          window.FirebaseAPI.batchUpsert(assets); // Fallback
+        }
+      }
     }
 
     function updateOperator() {
@@ -597,7 +703,7 @@
       showFeedback("success", `成功點存：${item.name}`, `編號 ${item.code} 已記錄完成！操作人：${currentOperator}`);
       pushRecentScan(item.code, item.name, "success", timeString);
 
-      saveAssetsToStorage();
+      saveAssetsToStorage(item);
       renderTable();
     }
 
@@ -752,6 +858,7 @@
           item.category = category;
           item.location = location;
           item.notes = notes;
+          saveAssetsToStorage(item);
         }
       } else {
         // 新增 (檢查重複)
@@ -760,7 +867,7 @@
           alert(`資產編號 ${code} 已經存在！請使用其他編號。`);
           return;
         }
-        assets.push({
+        const newItem = {
           code,
           name,
           category,
@@ -769,10 +876,11 @@
           status: "unscanned",
           scanned_by: "",
           scanned_at: ""
-        });
+        };
+        assets.push(newItem);
+        saveAssetsToStorage(newItem);
       }
 
-      saveAssetsToStorage();
       renderTable();
       closeModal();
     }
@@ -783,7 +891,7 @@
         const item = assets.find(a => a.code === code);
         if (item) {
           item.status = "deleted";
-          saveAssetsToStorage();
+          saveAssetsToStorage(item);
           renderTable();
         }
       }
@@ -858,7 +966,7 @@
           }
         }
 
-        saveAssetsToStorage();
+        saveAssetsToStorage(null, true);
         renderTable();
         alert(`成功匯入！\n新增物資: ${importCount} 筆\n更新資料: ${updateCount} 筆`);
         switchTab("list");
@@ -917,7 +1025,7 @@
         });
         recentScans = [];
         document.getElementById("recent-scans-list").innerHTML = `<p class="text-slate-400 py-3 text-center">已開始新一輪點存</p>`;
-        saveAssetsToStorage();
+        saveAssetsToStorage(null, true);
         renderTable();
         alert("已成功重設！可開始新一輪點存。");
       }
