@@ -71,7 +71,7 @@
 
       <!-- 操作人員與管理員解鎖 -->
       <div class="flex items-center space-x-2">
-        <input type="text" id="operatorInput" onchange="updateOperator()" value="點存同事" placeholder="輸入姓名" class="text-xs bg-slate-50 border border-slate-300 rounded-lg px-2 py-1.5 w-20 focus:outline-none focus:ring-2 focus:ring-brand-500 text-center">
+        <input type="text" id="operatorInput" onchange="updateOperator()" value="" placeholder="輸入姓名" class="text-xs bg-slate-50 border-rose-300 rounded-lg px-2 py-1.5 w-20 focus:outline-none focus:ring-2 focus:ring-brand-500 text-center animate-pulse placeholder-rose-400 font-bold">
         <button id="adminLoginBtn" onclick="openAdminModal()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 px-2 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1">
           🔒 <span class="hidden sm:inline">管理員</span>
         </button>
@@ -356,7 +356,7 @@
 
     // 全局狀態
     let assets = [];
-    let currentOperator = "點存同事";
+    let currentOperator = "";
     let html5QrCode = null;
     let isCameraRunning = false;
     let recentScans = [];
@@ -393,9 +393,19 @@
     }
 
     function updateOperator() {
-      currentOperator = document.getElementById("operatorInput").value.trim() || "點存同事";
+      const input = document.getElementById("operatorInput");
+      currentOperator = input.value.trim();
+      
+      // 有輸入名字時取消紅色警告提示
+      if (currentOperator) {
+        input.classList.remove("border-rose-300", "animate-pulse", "placeholder-rose-400");
+        input.classList.add("border-slate-300");
+      } else {
+        input.classList.add("border-rose-300", "animate-pulse", "placeholder-rose-400");
+        input.classList.remove("border-slate-300");
+      }
     }
-
+    
     // ==========================================
     // 管理員解鎖邏輯
     // ==========================================
@@ -546,6 +556,17 @@
     }
 
     function processCodeVerification(code) {
+      // 檢查是否已輸入姓名
+      if (!currentOperator) {
+        playSound("error");
+        showFeedback("error", "⚠️ 請先輸入姓名", "請先在右上角輸入您的姓名，然後再開始掃描。");
+        const nameInput = document.getElementById("operatorInput");
+        nameInput.focus();
+        nameInput.classList.add("ring-2", "ring-rose-500");
+        setTimeout(() => nameInput.classList.remove("ring-2", "ring-rose-500"), 2000);
+        return;
+      }
+
       const now = new Date();
       const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
       
@@ -911,16 +932,25 @@
       document.getElementById("view-excel").classList.add("hidden");
       document.getElementById(`view-${tabId}`).classList.remove("hidden");
 
-      // 手機底欄樣式切換
+      // 手機底欄與桌面標籤樣式切換 (不影響隱藏邏輯)
       ["scan", "list", "excel"].forEach(t => {
         const btnM = document.getElementById(`tab-btn-${t}-m`);
         const btnPc = document.getElementById(`tab-btn-${t}-pc`);
+        
         if (t === tabId) {
-          btnM.className = "flex-1 py-2 flex flex-col items-center text-brand-600 font-bold text-[11px]";
-          btnPc.className = "tab-btn py-3 px-4 font-semibold text-sm border-b-2 border-brand-600 text-brand-600 flex items-center gap-2";
+          // 啟用狀態
+          btnM.classList.remove("text-slate-400", "font-medium");
+          btnM.classList.add("text-brand-600", "font-bold");
+          
+          btnPc.classList.remove("border-transparent", "text-slate-500", "font-medium");
+          btnPc.classList.add("border-b-2", "border-brand-600", "text-brand-600", "font-semibold");
         } else {
-          btnM.className = "flex-1 py-2 flex flex-col items-center text-slate-400 font-medium text-[11px]";
-          btnPc.className = "tab-btn py-3 px-4 font-medium text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center gap-2";
+          // 閒置狀態
+          btnM.classList.remove("text-brand-600", "font-bold");
+          btnM.classList.add("text-slate-400", "font-medium");
+          
+          btnPc.classList.remove("border-brand-600", "text-brand-600", "font-semibold");
+          btnPc.classList.add("border-transparent", "text-slate-500", "font-medium");
         }
       });
 
